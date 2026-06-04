@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Agent Traces
 
-## Getting Started
+Internal OpenAI-compatible tracing ingest service and viewer for `agent-js`.
 
-First, run the development server:
+## Setup
+
+Create `.env` from `.env.example`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/agent-traces
+TRACE_INGEST_TOKEN=change-me
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Install and migrate:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+# Create the database first if your Postgres server does not have it yet.
+npm run db:generate
+npm run db:migrate
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open http://localhost:3000/traces.
 
-## Learn More
+## Ingest
 
-To learn more about Next.js, take a look at the following resources:
+The ingest endpoint is compatible with the OpenAI tracing exporter payload shape:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```http
+POST /v1/traces/ingest
+Authorization: Bearer $TRACE_INGEST_TOKEN
+OpenAI-Beta: traces=v1
+Content-Type: application/json
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+{ "data": [trace_or_span_json, ...] }
+```
 
-## Deploy on Vercel
+The route accepts `trace` and `trace.span` items, stores raw JSON, and builds indexes for the viewer.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Point the agent tracing exporter at this service by setting its endpoint to:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```txt
+http://<trace-host>:3000/v1/traces/ingest
+```
+
+## Health
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+## Development
+
+```bash
+npm run lint
+npm run build
+npm run db:studio
+```
