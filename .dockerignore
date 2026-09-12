@@ -1,9 +1,9 @@
 .git
-.next
-node_modules
-npm-debug.log*
-Dockerfile
-.dockerignore
-.env
-.env*.local
-*.tsbuildinfo
+.env*
+target
+data
+backups
+web/node_modules
+web/.svelte-kit
+web/build
+web/test-results

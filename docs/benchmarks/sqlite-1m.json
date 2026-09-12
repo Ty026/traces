@@ -1,0 +1,162 @@
+{
+  "timestamp": "2026-09-12T05:58:50.446580+00:00",
+  "host": "Linux-6.19.14-arch1-1-x86_64-with-glibc2.43",
+  "cpu": "",
+  "seedSpans": 1000000,
+  "seedPayloadBytes": 4096,
+  "readConcurrency": 4,
+  "readTargetRps": 40,
+  "phases": [
+    {
+      "targetSpansPerSecond": 100,
+      "seconds": 30.0,
+      "accepted": 3000,
+      "achievedSpansPerSecond": 100.0
+    },
+    {
+      "targetSpansPerSecond": 1000,
+      "seconds": 10.0,
+      "accepted": 10000,
+      "achievedSpansPerSecond": 1000.0
+    }
+  ],
+  "queries": {
+    "recent": {
+      "count": 145,
+      "p50Ms": 1.27,
+      "p95Ms": 2.43,
+      "maxMs": 3.69
+    },
+    "errors": {
+      "count": 146,
+      "p50Ms": 1.42,
+      "p95Ms": 2.76,
+      "maxMs": 5.14
+    },
+    "type": {
+      "count": 147,
+      "p50Ms": 2.45,
+      "p95Ms": 4.46,
+      "maxMs": 11.27
+    },
+    "model": {
+      "count": 148,
+      "p50Ms": 1.56,
+      "p95Ms": 3.53,
+      "maxMs": 7.91
+    },
+    "workflow": {
+      "count": 147,
+      "p50Ms": 30.87,
+      "p95Ms": 43.4,
+      "maxMs": 56.65
+    },
+    "error_text": {
+      "count": 146,
+      "p50Ms": 30.11,
+      "p95Ms": 42.41,
+      "maxMs": 57.07
+    },
+    "no_match": {
+      "count": 145,
+      "p50Ms": 1.31,
+      "p95Ms": 2.41,
+      "maxMs": 5.19
+    },
+    "time_range": {
+      "count": 144,
+      "p50Ms": 1.39,
+      "p95Ms": 2.61,
+      "maxMs": 4.66
+    },
+    "detail": {
+      "count": 144,
+      "p50Ms": 0.95,
+      "p95Ms": 1.93,
+      "maxMs": 3.44
+    },
+    "tree": {
+      "count": 144,
+      "p50Ms": 1.1,
+      "p95Ms": 1.96,
+      "maxMs": 3.76
+    },
+    "body": {
+      "count": 144,
+      "p50Ms": 0.98,
+      "p95Ms": 1.75,
+      "maxMs": 2.21
+    }
+  },
+  "ingestion": {
+    "count": 400,
+    "p50Ms": 1.78,
+    "p95Ms": 3.88,
+    "maxMs": 7.34
+  },
+  "drainSeconds": 0.001,
+  "committedDuringRun": 13000,
+  "maxPending": 200,
+  "maxQueuedBytes": 2508200,
+  "errors": [],
+  "elapsedSeconds": 40.01,
+  "persistedNewSpans": 13000,
+  "databaseBytes": 4907114496,
+  "cpuModel": "AMD Ryzen 9 5900HS",
+  "containerCpuLimit": 2,
+  "containerMemoryLimitBytes": 2147483648,
+  "containerMemorySwapLimitBytes": 2147483648,
+  "storage": "Local NVMe /dev/nvme0n1p5; not tmpfs",
+  "baselineSpanCount": 1012030,
+  "finalSpanCount": 1025030,
+  "containerImage": "sha256:a27e01f4e0ada9270fc618d8e14c51d3c8915f02b955723b94f3d55d385acb17",
+  "dockerMemorySamples": [
+    "55MiB / 2GiB",
+    "49.5MiB / 2GiB",
+    "57.04MiB / 2GiB",
+    "65.35MiB / 2GiB",
+    "56.93MiB / 2GiB",
+    "61.91MiB / 2GiB",
+    "61.82MiB / 2GiB",
+    "65.29MiB / 2GiB",
+    "63.42MiB / 2GiB",
+    "63.12MiB / 2GiB",
+    "62.86MiB / 2GiB",
+    "63.57MiB / 2GiB",
+    "64.05MiB / 2GiB",
+    "64.73MiB / 2GiB",
+    "65.88MiB / 2GiB",
+    "73.11MiB / 2GiB",
+    "71.34MiB / 2GiB",
+    "72.74MiB / 2GiB",
+    "73.34MiB / 2GiB",
+    "81.8MiB / 2GiB",
+    "81.2MiB / 2GiB",
+    "80.94MiB / 2GiB"
+  ],
+  "dockerCpuSamples": [
+    "26.78%",
+    "41.24%",
+    "27.60%",
+    "25.19%",
+    "21.92%",
+    "21.79%",
+    "25.79%",
+    "26.20%",
+    "26.08%",
+    "20.52%",
+    "20.83%",
+    "25.72%",
+    "30.33%",
+    "26.31%",
+    "26.75%",
+    "30.43%",
+    "36.28%",
+    "44.54%",
+    "40.53%",
+    "28.55%",
+    "0.03%",
+    "0.03%"
+  ],
+  "backendBinarySha256": "4d39e7b0f529764530b6f168e9b5044d0edb977ca51c3fccfc73236f959835c0"
+}

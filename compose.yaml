@@ -1,0 +1,21 @@
+services:
+  traces:
+    build: .
+    image: agent-traces:local
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      BIND_ADDR: 0.0.0.0:3000
+      DATABASE_PATH: /data/traces.sqlite3
+      BACKUP_DIR: /data/backups
+      STATIC_DIR: /app/web
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - traces-data:/data
+    cpus: 2
+    mem_limit: 2g
+    stop_grace_period: 60s
+volumes:
+  traces-data:
