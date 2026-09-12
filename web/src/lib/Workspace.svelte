@@ -88,7 +88,7 @@
       fetch("/api/me").then(async (r) => {
         if (r.ok) user = await r.json();
         else if (r.status !== 401)
-          throw new Error("Unable to connect. Please try again.");
+          throw new Error("Can't reach the server. Check that it's running.");
       }),
       api<{ ready: boolean }>("/auth/config").then((c) => (ready = c.ready)),
     ])
@@ -111,151 +111,123 @@
 
 <svelte:head
   ><title
-    >{traceId ? "Trace detail" : section === "keys" ? "API keys" : "Traces"} · Agent
-    Traces</title
+    >{traceId ? "Trace" : section === "keys" ? "API keys" : "Traces"} · Agent Traces</title
   ><meta
     name="description"
-    content="A clear view into every agent run."
+    content="Self-hosted viewer for agent traces."
   /></svelte:head
 >
 {#if !loaded}<div class="initial-loading">
-    <span class="brand-mark"><Icon name="trace" size={24} /></span><span
+    <span class="brand-mark"><Icon name="trace" size={20} /></span><span
       class="spinner"
     ></span>
   </div>
 {:else if !user}
   <div class="login-page">
-    <div class="login-wordmark">
-      <span class="brand-mark"><Icon name="trace" size={22} /></span>Agent
-      Traces
-    </div>
     <button
       class="icon-button login-theme"
       onclick={theme}
-      aria-label="Toggle theme"><Icon name={dark ? "sun" : "moon"} /></button
+      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+      ><Icon name={dark ? "sun" : "moon"} /></button
     >
     <main class="login-card">
-      <span class="eyebrow">A CLEARER VIEW</span>
-      <h1>Every step.<br />The whole story.</h1>
+      <span class="brand-mark"><Icon name="trace" size={22} /></span>
+      <h1>Sign in to Agent Traces</h1>
       <p>
-        Follow your agents from the first thought to the final response. Find
-        the details that make a difference.
+        Use a GitHub account with a verified email on this server's access list.
       </p>
       {#if error}<div class="notice error">
           {error}<button class="text-button" onclick={() => location.reload()}
             >Try again</button
           >
         </div>{/if}
-      {#if authError}<div class="notice error">
+      {#if authError}<div class="notice error" role="alert">
           {authError === "not_allowed"
-            ? "Your verified GitHub emails are not on the access list. Contact your administrator."
-            : "GitHub sign-in was canceled. You can try again."}
+            ? "None of your verified GitHub emails are on the access list. Ask an administrator to add one to ALLOWED_EMAILS."
+            : "GitHub sign-in didn't finish. Try again."}
         </div>{/if}
       {#if ready}<a href="/auth/github" class="button primary github-button"
-          ><Icon name="github" size={20} />Continue with GitHub<Icon
-            name="arrow"
-            size={16}
-          /></a
+          ><Icon name="github" size={18} />Continue with GitHub</a
         >
-        <div class="login-note">
-          Access is limited to approved team members.
-        </div>
-      {:else}<div class="notice">
-          <strong>Almost ready</strong>
+      {:else if !error}<div class="notice">
+          <strong>GitHub sign-in isn't configured</strong>
           <p>
-            Your administrator needs to configure GitHub sign-in and the email
-            access list.
+            Set <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code>
+            and <code>ALLOWED_EMAILS</code>, then restart the server.
           </p>
         </div>{/if}
-      <div class="login-preview" aria-hidden="true">
-        <div>
-          <span class="status-dot"></span>Research assistant<span class="muted"
-            >4.28 s</span
-          >
-        </div>
-        <div class="preview-step">
-          <Icon name="layers" size={14} />Plan a response<i style="width:65%"
-          ></i>
-        </div>
-        <div class="preview-step indent">
-          <Icon name="code" size={14} />Search documents<i style="width:40%"
-          ></i>
-        </div>
-        <div class="preview-step">
-          <Icon name="check" size={14} />Generate answer<i style="width:80%"
-          ></i>
-        </div>
-      </div>
     </main>
-    <footer>Built for the details.</footer>
   </div>
 {:else}
   <div class="workspace">
     <aside class="sidebar">
       <a href="/traces" class="wordmark"
-        ><span class="brand-mark"><Icon name="trace" size={20} /></span><span
+        ><span class="brand-mark"><Icon name="trace" size={17} /></span><span
           >Agent Traces</span
         ></a
       >
-      <div class="workspace-label">WORKSPACE</div>
       <nav aria-label="Main navigation">
-        <a href="/traces" class:active={section === "traces"}
-          ><Icon name="trace" /><span>Traces</span><span class="nav-shortcut"
-            >G T</span
+        <a
+          href="/traces"
+          class:active={section === "traces"}
+          aria-current={section === "traces" ? "page" : undefined}
+          title="Traces (G then T)"
+          ><Icon name="trace" size={17} /><span>Traces</span><kbd
+            class="nav-shortcut">G T</kbd
           ></a
-        ><a href="/keys" class:active={section === "keys"}
-          ><Icon name="key" /><span>API keys</span></a
+        ><a
+          href="/keys"
+          class:active={section === "keys"}
+          aria-current={section === "keys" ? "page" : undefined}
+          title="API keys"><Icon name="key" size={17} /><span>API keys</span></a
         >
       </nav>
       <div class="sidebar-bottom">
-        <div class="retention">
+        <div class="retention" title="Traces expire after their last update">
           <Icon name="clock" size={14} /><span
             >{status?.retentionDays === 0
-              ? "No automatic expiration"
-              : `${status?.retentionDays ?? 30}-day retention`}</span
+              ? "Traces kept indefinitely"
+              : `Traces kept ${status?.retentionDays ?? 30} days`}</span
           >
         </div>
-        <div class="sidebar-rule"></div>
         <div class="account">
-          <span class="avatar">{user.login.slice(0, 2).toUpperCase()}</span>
-          <div><strong>{user.login}</strong><span>Administrator</span></div>
+          <span class="avatar" aria-hidden="true"
+            >{user.login.slice(0, 2).toUpperCase()}</span
+          >
+          <div>
+            <strong>{user.login}</strong><span title={user.email}
+              >{user.email}</span
+            >
+          </div>
+        </div>
+        <div class="sidebar-actions">
           <button
+            class="icon-button"
+            onclick={theme}
+            title={dark ? "Switch to light theme" : "Switch to dark theme"}
+            aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+            ><Icon name={dark ? "sun" : "moon"} size={16} /></button
+          ><button
             class="icon-button"
             onclick={logout}
             title="Sign out"
-            aria-label="Sign out"><Icon name="logout" size={17} /></button
+            aria-label="Sign out"><Icon name="logout" size={16} /></button
           >
         </div>
-        <button class="theme-button" onclick={theme}
-          ><Icon name={dark ? "sun" : "moon"} size={15} />{dark
-            ? "Light appearance"
-            : "Dark appearance"}</button
-        >
       </div>
     </aside>
     <div class="main-shell">
-      <header class="topbar">
-        <div class="breadcrumb">
-          Workspace<Icon name="arrow" size={12} /><span
-            >{section === "keys" ? "API keys" : "Traces"}</span
-          >{#if traceId}<Icon name="arrow" size={12} /><span class="mono muted"
-              >{traceId.slice(0, 18)}…</span
-            >{/if}
-        </div>
-        <span class="private-badge"
-          ><span class="status-dot"></span>Private workspace</span
-        >
-      </header>
       {#if status && (!status.writerHealthy || !status.maintenanceHealthy)}<div
           class="service-warning"
           role="alert"
         >
           <Icon name="alert" size={16} />{!status.writerHealthy
-            ? `Storage is unavailable. ${status.pending} records are waiting; new ingestion is paused.`
-            : "Data cleanup or backup needs attention. Check the service logs."}
+            ? `Storage is unavailable. ${status.pending.toLocaleString()} records are waiting to be written, and new traces are being rejected.`
+            : "Cleanup or backup failed. Check the server logs."}
         </div>{/if}
       <main class="main-content">
         {#if section === "keys"}<Keys {notify} />{:else}<div
+            class="list-frame"
             class:hidden={!!traceId}
           >
             <TraceList active={!traceId} {notify} />
@@ -268,6 +240,4 @@
     </div>
   </div>
 {/if}
-{#if toast}<div class="toast" role="status">
-    <Icon name="check" size={16} />{toast}
-  </div>{/if}
+{#if toast}<div class="toast" role="status">{toast}</div>{/if}

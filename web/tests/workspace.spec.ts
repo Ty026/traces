@@ -27,9 +27,9 @@ async function login(context: BrowserContext) {
 test("private workspace and static deep links", async ({ page }) => {
   await page.goto("/traces/ui-trace-000");
   await expect(
-    page.getByRole("heading", { name: "Every step. The whole story." }),
+    page.getByRole("heading", { name: "Sign in to Agent Traces" }),
   ).toBeVisible();
-  await expect(page.getByText("Almost ready")).toBeVisible();
+  await expect(page.getByText("GitHub sign-in isn't configured")).toBeVisible();
   await page.screenshot({ path: "test-results/login.png", fullPage: true });
 });
 test("filters, pagination, details, payload escaping and return state", async ({
@@ -70,7 +70,9 @@ test("filters, pagination, details, payload escaping and return state", async ({
     .getByRole("textbox", { name: "Find in this trace" })
     .fill("literal payload");
   await page.getByRole("button", { name: "Find", exact: true }).click();
-  await expect(page.getByText("1 matching steps")).toBeVisible();
+  await expect(
+    page.getByText("1 matching step", { exact: true }),
+  ).toBeVisible();
   await page.locator(".step-select").first().click();
   await expect(
     page.getByText(
@@ -85,7 +87,7 @@ test("filters, pagination, details, payload escaping and return state", async ({
   await page.getByRole("tab", { name: "Raw JSON" }).click();
   await expect(page.locator(".inspector-body")).toContainText("span_data");
   const download = page.waitForEvent("download");
-  await page.getByRole("link", { name: "Export", exact: true }).click();
+  await page.getByRole("link", { name: "Export JSON", exact: true }).click();
   expect((await download).suggestedFilename()).toBe("trace.json");
   await page.reload();
   await expect(
@@ -101,7 +103,7 @@ test("filters, pagination, details, payload escaping and return state", async ({
     page.getByRole("textbox", { name: "Search traces" }),
   ).toHaveValue("Research");
   await page
-    .getByRole("button", { name: "Dark appearance", exact: true })
+    .getByRole("button", { name: "Switch to dark theme", exact: true })
     .click();
   await page.screenshot({
     path: "test-results/traces-dark.png",
@@ -171,7 +173,14 @@ test("ten thousand steps stay virtualized and keyboard navigable", async ({
   expect(await page.getByRole("treeitem").count()).toBeLessThan(45);
   const tree = page.getByRole("tree", { name: "Execution steps" });
   await tree.evaluate((el) => (el.scrollTop = 400000));
-  await expect(page.locator(".tree-row").first()).toHaveCSS("top", /399/);
+  await expect
+    .poll(() =>
+      page
+        .locator(".tree-row")
+        .first()
+        .evaluate((el) => parseFloat((el as HTMLElement).style.top)),
+    )
+    .toBeGreaterThan(300000);
   expect(await page.getByRole("treeitem").count()).toBeLessThan(45);
   await tree.evaluate((el) => (el.scrollTop = 0));
   await tree.focus();
@@ -275,12 +284,12 @@ test("list scroll survives detail navigation and updates wait for the reader", a
   }, key.key);
   await expect(
     page.getByRole("button", {
-      name: "Updated traces available · Show latest",
+      name: "New traces arrived. Show latest",
     }),
   ).toBeVisible({ timeout: 12000 });
   expect(await page.locator(".trace-link").first().innerText()).toBe(first);
   await page
-    .getByRole("button", { name: "Updated traces available · Show latest" })
+    .getByRole("button", { name: "New traces arrived. Show latest" })
     .click();
   await expect(page.locator(".trace-link").first()).toContainText(
     "New live arrival",

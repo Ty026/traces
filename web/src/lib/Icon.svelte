@@ -1,9 +1,10 @@
 <script lang="ts">
   let { name, size = 18 }: { name: string; size?: number } = $props();
   const paths: Record<string, string> = {
-    trace: "M4 5h8M4 12h16M4 19h11M18 3v4m-2-2h4",
+    // Staggered bars: a waterfall of steps, the product's core view.
+    trace: "M4 6h8M8 12h10M12 18h8",
     search: "m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
-    key: "M14 7a5 5 0 1 1-9 3L2 13v4h4v3h4l5-5M16 7h.01",
+    key: "m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4m2-2-9.6 9.6M13 15.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0",
     arrow: "m9 5 7 7-7 7",
     back: "m14 6-6 6 6 6",
     plus: "M12 5v14M5 12h14",
@@ -25,10 +26,6 @@
     github:
       "M9 19c-4 1-4-2-6-2m12 5v-4c0-1 .1-2-1-3 3 0 6-1 6-5 0-1-1-3-2-3 0-1 0-2 0-3-2 0-3 1-3 1a13 13 0 0 0-6 0s-1-1-3-1c0 1 0 2 0 3-1 1-2 2-2 3 0 4 3 5 6 5-1 1-1 2-1 3v4",
     activity: "M2 12h4l3-8 6 16 3-8h4",
-    pause: "M8 5v14M16 5v14",
-    play: "m7 4 14 8-14 8V4",
-    settings: "M4 7h16M4 17h16M8 4v6m8 4v6",
-    expand: "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5",
   };
 </script>
 
@@ -38,7 +35,7 @@
   viewBox="0 0 24 24"
   fill="none"
   stroke="currentColor"
-  stroke-width="1.65"
+  stroke-width="1.75"
   stroke-linecap="round"
   stroke-linejoin="round"
   aria-hidden="true"><path d={paths[name] || paths.code} /></svg

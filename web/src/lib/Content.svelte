@@ -29,15 +29,17 @@
 </script>
 
 {#if value === null || value === undefined || value === ""}
-  <div class="content-empty">No content recorded for this step.</div>
+  <div class="content-empty">Not recorded</div>
 {:else if messages}
   {#each messages.slice(0, messageLimit) as message, i (i)}
     {@const m = object(message)}
     {#if m}
-      <section class="message">
+      <section class="message" data-role={String(m.role || m.type || "")}>
         <div class="message-role">
-          {String(m.role || m.type || "Message")}{#if m.name}<span
-              >{String(m.name)}</span
+          {String(m.role || m.type || "message")}{#if m.name}<span
+              class="mono">{String(m.name)}</span
+            >{/if}{#if m.tool_call_id}<span class="mono"
+              >{String(m.tool_call_id)}</span
             >{/if}
         </div>
         {#if m.content !== undefined}
@@ -53,18 +55,15 @@
             />{:else}<JsonView value={m.content} />{/if}
         {:else if typeof m.text === "string"}<LongText text={m.text} />
         {:else}<JsonView value={m} />{/if}
-        {#if m.tool_calls}<div class="message-role secondary">Tool calls</div>
+        {#if m.tool_calls}<div class="message-role secondary">tool calls</div>
           <JsonView value={m.tool_calls} />{/if}
-        {#if m.tool_call_id}<div class="mono muted">
-            Call {String(m.tool_call_id)}
-          </div>{/if}
       </section>
     {:else}<LongText text={pretty(message)} />{/if}
   {/each}
   {#if messages.length > messageLimit}<button
       class="text-button"
       onclick={() => (messageLimit += 100)}
-      >Show more messages ({messages.length - messageLimit} remaining)</button
+      >Show 100 more ({messages.length - messageLimit} hidden)</button
     >{/if}
 {:else if typeof value === "string"}<LongText text={value} />
 {:else}<JsonView {value} />{/if}

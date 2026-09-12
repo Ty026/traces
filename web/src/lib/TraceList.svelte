@@ -23,7 +23,8 @@
     until = $state<number | null>(null),
     customFrom = $state(""),
     customTo = $state("");
-  let tableElement = $state<HTMLDivElement | null>(null);
+  let tableElement = $state<HTMLDivElement | null>(null),
+    searchElement = $state<HTMLInputElement | null>(null);
   let savedScroll = 0;
   $effect(() => {
     if (active && !loading && tableElement) {
@@ -102,7 +103,7 @@
   }
   async function apply() {
     if (range === "custom" && customFrom && customTo && customFrom > customTo) {
-      notify("The start date must be before the end date.");
+      notify("The start of the range must be before the end.");
       return;
     }
     cursor = null;
@@ -136,6 +137,8 @@
     await load();
   }
   function open(trace: Trace) {
+    // Leave text selection in a row alone instead of navigating away.
+    if (getSelection()?.toString()) return;
     savedScroll = tableElement?.scrollTop ?? 0;
     sessionStorage.setItem(
       "trace-list-position",
@@ -191,6 +194,23 @@
       load();
     }
   });
+  function focusSearch(event: KeyboardEvent) {
+    if (
+      !active ||
+      event.key !== "/" ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      (event.target as HTMLElement)?.closest(
+        'input,textarea,select,[contenteditable="true"]',
+      ) ||
+      document.querySelector("dialog[open]")
+    )
+      return;
+    event.preventDefault();
+    searchElement?.focus();
+    searchElement?.select();
+  }
   onMount(() => {
     const href = location.pathname.startsWith("/traces/")
       ? sessionStorage.getItem("trace-list-href") || "/traces"
@@ -210,20 +230,22 @@
   });
 </script>
 
+<svelte:window onkeydown={focusSearch} />
 <section class="list-page">
   <div class="page-heading">
-    <div>
-      <div class="eyebrow">OBSERVABILITY</div>
-      <h1>Traces</h1>
-      <p>A closer look at every agent run.</p>
-    </div>
+    <h1>Traces</h1>
     <div class="heading-actions">
-      <button class="button subtle" class:live onclick={() => (live = !live)}
-        ><Icon name={live ? "pause" : "play"} size={14} />{live
-          ? "Live updates"
-          : "Updates paused"}</button
+      <button
+        class="button live-toggle"
+        class:live
+        aria-pressed={live}
+        title={live
+          ? "Checking for new traces every 5 seconds"
+          : "Not checking for new traces"}
+        onclick={() => (live = !live)}
+        ><span class="live-dot"></span>{live ? "Live" : "Paused"}</button
       ><button class="button" onclick={() => load()} disabled={loading}
-        ><Icon name="refresh" size={15} />Refresh</button
+        ><Icon name="refresh" size={14} />Refresh</button
       >
     </div>
   </div>
@@ -235,78 +257,69 @@
     }}
   >
     <label class="search-input"
-      ><Icon name="search" size={17} /><input
+      ><Icon name="search" size={15} /><input
         aria-label="Search traces"
-        placeholder="Search traces, workflows, errors…"
+        placeholder="Search ID, workflow, group, model or error"
+        bind:this={searchElement}
         bind:value={q}
-      /><kbd>↵</kbd></label
-    ><label class="select-wrap"
-      ><Icon name="clock" size={15} /><select
-        aria-label="Time range"
-        bind:value={range}
-        onchange={() => {
-          if (range !== "custom") apply();
-        }}
-        ><option value="1h">Last hour</option><option value="24h"
-          >Last 24 hours</option
-        ><option value="7d">Last 7 days</option><option value="30d"
-          >Last 30 days</option
-        ><option value="all">All time</option><option value="custom"
-          >Custom range</option
-        ></select
-      ></label
-    ><select aria-label="Status filter" bind:value={status} onchange={apply}
-      ><option value="all">All statuses</option><option value="errors"
-        >Has errors</option
-      ><option value="open">Open / unknown</option><option value="no_errors"
-        >No recorded errors</option
+      /><kbd title="Press / to search">/</kbd></label
+    ><select
+      aria-label="Time range"
+      bind:value={range}
+      onchange={() => {
+        if (range !== "custom") apply();
+      }}
+      ><option value="1h">Last hour</option><option value="24h"
+        >Last 24 hours</option
+      ><option value="7d">Last 7 days</option><option value="30d"
+        >Last 30 days</option
+      ><option value="all">All time</option><option value="custom"
+        >Custom range…</option
       ></select
-    ><select aria-label="Span type" bind:value={spanType} onchange={apply}
-      ><option value="all">All step types</option
+    ><select aria-label="Status filter" bind:value={status} onchange={apply}
+      ><option value="all">Any status</option><option value="errors"
+        >Has errors</option
+      ><option value="no_errors">No errors</option><option value="open"
+        >Open</option
+      ></select
+    ><select aria-label="Step type" bind:value={spanType} onchange={apply}
+      ><option value="all">Any step type</option
       >{#each ["agent", "generation", "function", "handoff", "guardrail", "response", "mcp_tools", "custom", "unknown"] as type}<option
           value={type}>{type}</option
         >{/each}</select
-    ><button class="button filter-submit" type="submit"
-      ><Icon name="settings" size={15} />Apply</button
-    >
+    ><input
+      class="model-input"
+      aria-label="Model filter"
+      placeholder="Model (exact)"
+      bind:value={model}
+      onblur={() => {
+        if (
+          model !== (new URLSearchParams(location.search).get("model") || "")
+        )
+          apply();
+      }}
+    /><button class="filter-submit" type="submit" tabindex="-1">Apply</button>
   </form>
-  <div class="filter-secondary">
-    <label
-      >Model <input
-        aria-label="Model filter"
-        placeholder="Any model"
-        bind:value={model}
-        onkeydown={(e) => {
-          if (e.key === "Enter") apply();
-        }}
-        onblur={() => {
-          if (
-            model !== (new URLSearchParams(location.search).get("model") || "")
-          )
-            apply();
-        }}
-      /></label
-    >{#if range === "custom"}<label
-        >From <input
-          type="datetime-local"
-          aria-label="From date"
-          bind:value={customFrom}
-        /></label
-      ><label
-        >To <input
-          type="datetime-local"
-          aria-label="To date"
-          bind:value={customTo}
-        /></label
-      ><button class="text-button" onclick={apply}>Set range</button
-      >{/if}{#if filtered}<button class="text-button" onclick={clear}
-        >Clear filters</button
-      >{/if}<span class="result-count"
-      >{loading ? "Loading…" : `${rows.length} runs on this page`}</span
-    >
-  </div>
+  {#if range === "custom" || filtered}<div class="filter-secondary">
+      {#if range === "custom"}<label
+          >From <input
+            type="datetime-local"
+            aria-label="From date"
+            bind:value={customFrom}
+          /></label
+        ><label
+          >To <input
+            type="datetime-local"
+            aria-label="To date"
+            bind:value={customTo}
+          /></label
+        ><button class="button small" onclick={apply}>Apply range</button
+        >{/if}{#if filtered}<button class="text-button" onclick={clear}
+          >Clear filters</button
+        >{/if}
+    </div>{/if}
   {#if fresh}<button class="new-data" onclick={() => load()}
-      ><Icon name="refresh" size={14} />Updated traces available · Show latest</button
+      ><Icon name="refresh" size={14} />New traces arrived. Show latest</button
     >{/if}
   {#if error}<div class="notice error" role="alert">
       {error}<button class="button" onclick={() => load()}>Try again</button>
@@ -317,19 +330,20 @@
         </div>{/each}
     </div>
   {:else if !rows.length}<div class="empty-state">
-      <span class="empty-icon"
-        ><Icon name={filtered ? "search" : "trace"} size={28} /></span
-      >
-      <h2>{filtered ? "No matching traces" : "Your next run starts here"}</h2>
-      <p>
-        {filtered
-          ? "Try another search or widen the time range."
-          : "Create an API key and connect your agent to start exploring its runs."}
-      </p>
-      {#if filtered}<button class="button" onclick={clear}>Clear filters</button
-        >{:else}<a class="button primary" href="/keys"
-          ><Icon name="key" size={16} />Create an API key</a
-        >{/if}
+      {#if filtered}
+        <h2>No traces match these filters</h2>
+        <p>Try a different search or a wider time range.</p>
+        <button class="button" onclick={clear}>Clear filters</button>
+      {:else}
+        <h2>No traces in the last 7 days</h2>
+        <p>
+          Traces show up here as soon as an agent sends them. Create an API key
+          to connect one.
+        </p>
+        <a class="button primary" href="/keys"
+          ><Icon name="key" size={15} />Create API key</a
+        >
+      {/if}
     </div>
   {:else}<div
       class="trace-table-wrap"
@@ -339,50 +353,48 @@
       <table class="trace-table">
         <thead
           ><tr
-            ><th>Workflow / Trace</th><th>Status</th><th>Steps</th><th
+            ><th>Workflow</th><th>Status</th><th>Steps</th><th class="numeric"
               >Duration</th
-            ><th>Received</th><th><span class="sr-only">Open</span></th></tr
+            ><th>Received</th></tr
           ></thead
         ><tbody
-          >{#each rows as trace (trace.id)}<tr
+          >{#each rows as trace (trace.id)}<tr onclick={() => open(trace)}
               ><td
-                ><button class="trace-link" onclick={() => open(trace)}
-                  ><span class="workflow-icon"
-                    ><Icon name="layers" size={16} /></span
-                  ><span
-                    ><strong>{trace.workflowName}</strong><span
-                      class="mono row-id"
-                      >{trace.id}{#if trace.groupId}<span class="group-id">
-                          · {trace.groupId}</span
-                        >{/if}</span
-                    ></span
+                ><button
+                  class="trace-link"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    open(trace);
+                  }}
+                  ><strong>{trace.workflowName}</strong><span
+                    class="mono row-id"
+                    >{trace.id}{#if trace.groupId}<span class="group-id"
+                        >{` · ${trace.groupId}`}</span
+                      >{/if}</span
                   ></button
                 ></td
               ><td
-                >{#if trace.errorCount}<span class="badge error"
-                    ><span class="status-dot"></span>{trace.errorCount}
+                >{#if trace.errorCount}<span class="status error"
+                    ><span class="status-dot"></span>{trace.errorCount.toLocaleString()}
                     {trace.errorCount === 1 ? "error" : "errors"}</span
                   >{:else if trace.unfinishedCount || !trace.spanCount}<span
-                    class="badge"
-                    ><span class="status-dot neutral"></span>Open / unknown</span
-                  >{:else}<span class="badge success"
+                    class="status neutral"
+                    title="No steps yet, or a step has no end time"
+                    ><span class="status-dot"></span>Open</span
+                  >{:else}<span class="status success"
                     ><span class="status-dot"></span>No errors</span
                   >{/if}</td
-              ><td class="tabular"
-                >{trace.spanCount}<span class="cell-sub"
-                  >{trace.generationCount} model · {trace.functionCount} tool</span
+              ><td
+                ><span class="mono">{trace.spanCount.toLocaleString()}</span
+                ><span class="cell-sub step-mix"
+                  ><span class="type-dot model"></span>{trace.generationCount}
+                  model<span class="type-dot tool"></span>{trace.functionCount}
+                  tool</span
                 ></td
-              ><td class="mono">{duration(trace.durationMs)}</td><td
+              ><td class="mono numeric">{duration(trace.durationMs)}</td><td
                 title={date(trace.lastSeen)}
                 >{relative(trace.lastSeen)}<span class="cell-sub"
                   >{date(trace.lastSeen)}</span
-                ></td
-              ><td
-                ><button
-                  class="icon-button"
-                  aria-label={`Open ${trace.workflowName}`}
-                  onclick={() => open(trace)}
-                  ><Icon name="arrow" size={16} /></button
                 ></td
               ></tr
             >{/each}</tbody
@@ -391,26 +403,22 @@
     </div>
     <div class="pagination">
       <span
-        >Page {history.length + 1}<span class="muted">
-          · Newest received first</span
+        >Page {history.length + 1}<span class="muted"
+          >{` · ${rows.length} ${rows.length === 1 ? "trace" : "traces"} · newest first`}</span
         ></span
       >
       <div>
         <button
-          class="button"
+          class="button small"
           onclick={() => turn(false)}
           disabled={!history.length || loading}
-          ><Icon name="back" size={14} />Previous</button
+          ><Icon name="back" size={13} />Previous</button
         ><button
-          class="button"
+          class="button small"
           onclick={() => turn(true)}
           disabled={!next || loading}
-          >Next<Icon name="arrow" size={14} /></button
+          >Next<Icon name="arrow" size={13} /></button
         >
       </div>
     </div>{/if}
-  <div class="page-footnote">
-    <Icon name="activity" size={14} />A trace is a record of an agent run. Each
-    step captures a model call, tool, or handoff.
-  </div>
 </section>

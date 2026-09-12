@@ -43,6 +43,12 @@
     deleting = $state(false),
     confirmDelete = $state(false);
   let listHref = $state("/traces");
+  const tabs = [
+    ["content", "Input & output"],
+    ["data", "Step data"],
+    ["raw", "Raw JSON"],
+    ["trace", "Trace metadata"],
+  ];
   const activeSpan = $derived(spans.find((s) => s.id === selected));
   const data = $derived((raw?.span_data as Record<string, unknown>) || {});
   const totals = $derived(
@@ -99,7 +105,7 @@
     walk(spans.filter((s) => !rootReachable.has(s.id) && !visited.has(s.id)));
     return matches ? result.filter((row) => matches!.has(row.span.id)) : result;
   });
-  const rowHeight = 40;
+  const rowHeight = 36;
   const start = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - 6));
   const visible = $derived(
     rows.slice(start, start + Math.ceil(viewport / rowHeight) + 12),
@@ -126,6 +132,24 @@
       Math.min(100 - left, ((span.durationMs || 0) / totalDuration) * 100),
     );
     return `left:${left}%;width:${width}%`;
+  }
+  // Groups step types by what they cost: model calls, tool calls, and orchestration.
+  function kind(span: Span) {
+    if (span.hasError) return "error";
+    if (span.spanType === "generation" || span.spanType === "response")
+      return "model";
+    if (span.spanType === "function" || span.spanType === "mcp_tools")
+      return "tool";
+    return "agent";
+  }
+  const kindIcon: Record<string, string> = {
+    error: "alert",
+    model: "activity",
+    tool: "code",
+    agent: "layers",
+  };
+  function plural(n: number, word: string) {
+    return `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
   }
   async function load() {
     try {
@@ -200,12 +224,12 @@
       if (seq === searchSequence) searching = false;
     }
   }
-  async function copied(value: unknown, message = "Copied to clipboard") {
+  async function copied(value: unknown, message = "Copied") {
     try {
       await copy(pretty(value));
       notify(message);
     } catch {
-      notify("Clipboard unavailable. Select and copy the text manually.");
+      notify("Couldn't access the clipboard. Select the text and copy it.");
     }
   }
   function keyboard(e: KeyboardEvent) {
@@ -299,7 +323,7 @@
     ><Icon name="back" size={14} />All traces</a
   >
   {#if loading}<div class="detail-loading">
-      <span class="spinner"></span>Loading execution…
+      <span class="spinner"></span>Loading trace…
     </div>{:else if error}<div class="notice error" role="alert">
       {error}<button
         class="button"
@@ -311,57 +335,69 @@
       >
     </div>{:else if trace}
     <div class="detail-heading">
-      <div>
+      <div class="detail-title">
         <h1>{trace.workflowName}</h1>
         <button
           class="id-copy mono"
+          title="Copy trace ID"
           onclick={() => copied(id, "Trace ID copied")}
-          >{id}<Icon name="copy" size={13} /></button
+          >{id}<Icon name="copy" size={12} /></button
         >
       </div>
       <div class="heading-actions">
         <a
           class="button"
           href={`/api/traces/${encodeURIComponent(id)}/export`}
-          download="trace.json"><Icon name="download" size={15} />Export</a
+          download="trace.json"
+          ><Icon name="download" size={14} /><span>Export JSON</span></a
         ><button
           class="icon-button danger-hover"
           onclick={() => (confirmDelete = true)}
-          aria-label="Delete trace"><Icon name="trash" size={17} /></button
+          title="Delete trace"
+          aria-label="Delete trace"><Icon name="trash" size={16} /></button
         >
       </div>
     </div>
-    <div class="trace-stats">
+    <dl class="trace-stats">
       <div>
-        <span>Status</span>{#if trace.errorCount}<strong class="error-text"
-            ><span class="status-dot"></span>{trace.errorCount} errors</strong
-          >{:else}<strong
-            ><span class="status-dot neutral"></span>{trace.unfinishedCount ||
-            !trace.spanCount
-              ? "Open / unknown"
-              : "No recorded errors"}</strong
-          >{/if}
+        <dt>Status</dt>
+        {#if trace.errorCount}<dd class="status error">
+            <span class="status-dot"></span>{plural(trace.errorCount, "error")}
+          </dd>{:else if trace.unfinishedCount || !trace.spanCount}<dd
+            class="status neutral"
+            title="No steps yet, or a step has no end time"
+          >
+            <span class="status-dot"></span>Open
+          </dd>{:else}<dd class="status success">
+            <span class="status-dot"></span>No errors
+          </dd>{/if}
       </div>
       <div>
-        <span>Duration</span><strong class="mono"
-          >{duration(trace.durationMs)}</strong
-        >
+        <dt>Duration</dt>
+        <dd class="mono">{duration(trace.durationMs)}</dd>
       </div>
       <div>
-        <span>Steps</span><strong>{trace.spanCount.toLocaleString()}</strong>
+        <dt>Steps</dt>
+        <dd class="mono">{trace.spanCount.toLocaleString()}</dd>
       </div>
       <div>
-        <span>Tokens</span><strong
-          >{(totals.input + totals.output).toLocaleString()}<small
+        <dt>Tokens</dt>
+        <dd>
+          <span class="mono"
+            >{(totals.input + totals.output).toLocaleString()}</span
+          ><small class="mono"
             >{totals.input.toLocaleString()} in / {totals.output.toLocaleString()}
             out</small
-          ></strong
-        >
+          >
+        </dd>
       </div>
-      <div><span>Received</span><strong>{date(trace.lastSeen)}</strong></div>
-    </div>
+      <div>
+        <dt>Last update</dt>
+        <dd>{date(trace.lastSeen)}</dd>
+      </div>
+    </dl>
     {#if updated}<button class="new-data" onclick={load}
-        ><Icon name="refresh" size={14} />This run has new data · Update view</button
+        ><Icon name="refresh" size={14} />This trace has new data. Reload it</button
       >{/if}
     <div
       class="execution-layout"
@@ -372,13 +408,10 @@
       <section class="execution-pane">
         <div class="panel-heading">
           <h2>Execution</h2>
-          <span>{spans.length.toLocaleString()} steps</span><button
-            class="icon-button"
-            aria-label="Expand all steps"
-            title="Expand all steps"
-            onclick={() => (collapsed = new Set())}
-            ><Icon name="expand" size={15} /></button
-          >
+          <span>{plural(spans.length, "step")}</span>{#if collapsed.size}<button
+              class="text-button"
+              onclick={() => (collapsed = new Set())}>Expand all</button
+            >{/if}
         </div>
         <form
           class="trace-search"
@@ -387,9 +420,9 @@
             search();
           }}
         >
-          <Icon name="search" size={15} /><input
+          <Icon name="search" size={14} /><input
             aria-label="Find in this trace"
-            placeholder="Find in this trace…"
+            placeholder="Find text in step payloads"
             bind:value={find}
           />{#if matches}<button
               class="icon-button"
@@ -398,7 +431,7 @@
               onclick={() => {
                 find = "";
                 search();
-              }}><Icon name="close" size={14} /></button
+              }}><Icon name="close" size={13} /></button
             >{:else}<button
               class="text-button"
               type="submit"
@@ -406,12 +439,21 @@
             >{/if}
         </form>
         {#if matches}<div class="search-results">
-            {matches.size}{searchTruncated ? "+" : ""} matching steps
-          </div>{/if}{#if searchError}<div class="notice error">
+            {plural(matches.size, "matching step")}{searchTruncated
+              ? " (showing the first 1,000)"
+              : ""}
+          </div>{/if}{#if searchError}<div class="notice error compact">
             {searchError}
           </div>{/if}
-        <div class="tree-columns">
-          <span>Step</span><span>Timeline / duration</span>
+        <div class="tree-columns" aria-hidden="true">
+          <span class="tree-columns-name">Step</span><span class="ruler-cell"
+            ><span class="ruler"
+              >{#if trace.startedAt}{#each [0, 0.5, 1] as f (f)}<span
+                    style={`left:${f * 100}%`}
+                    >{f ? duration(Math.round(totalDuration * f)) : "0"}</span
+                  >{/each}{/if}</span
+            ><span class="ruler-duration">Duration</span></span
+          >
         </div>
         <div
           class="tree-viewport"
@@ -424,11 +466,11 @@
           aria-label="Execution steps"
         >
           <div style={`height:${rows.length * rowHeight}px;position:relative`}>
-            {#each visible as row, i (row.span.id)}{@const s = row.span}
+            {#each visible as row, i (row.span.id)}{@const s = row.span}{@const k =
+                kind(s)}
               <div
-                class="tree-row"
+                class={`tree-row kind-${k}`}
                 class:selected={selected === s.id}
-                class:has-error={s.hasError}
                 style={`position:absolute;top:${(start + i) * rowHeight}px;width:100%;height:${rowHeight}px`}
                 role="treeitem"
                 aria-selected={selected === s.id}
@@ -437,11 +479,11 @@
                   ? !collapsed.has(s.id)
                   : undefined}
               >
-                <div
-                  class="tree-name"
-                  style={`padding-left:${12 + row.depth * 16}px`}
-                >
-                  {#if children.has(s.id)}<button
+                <div class="tree-name">
+                  {#if row.depth}<span
+                      class="indent"
+                      style={`width:${row.depth * 16}px`}
+                    ></span>{/if}{#if children.has(s.id)}<button
                       class="tree-toggle"
                       class:expanded={!collapsed.has(s.id)}
                       onclick={() => toggle(s.id)}
@@ -450,18 +492,9 @@
                     >{:else}<span class="tree-toggle"></span>{/if}<button
                     class="step-select"
                     onclick={() => select(s.id)}
-                    title={s.name || s.spanType}
-                    ><span class="step-icon" class:error-text={s.hasError}
-                      ><Icon
-                        name={s.hasError
-                          ? "alert"
-                          : s.spanType === "function"
-                            ? "code"
-                            : s.spanType === "generation"
-                              ? "activity"
-                              : "layers"}
-                        size={14}
-                      /></span
+                    title={`${s.name || s.spanType} (${s.spanType})`}
+                    ><span class="step-icon"
+                      ><Icon name={kindIcon[k]} size={14} /></span
                     ><span>{s.name || s.spanType}</span></button
                   >
                 </div>
@@ -469,20 +502,21 @@
                   class="timeline-cell"
                   onclick={() => select(s.id)}
                   aria-label={`Inspect ${s.name || s.spanType}, ${duration(s.durationMs)}`}
-                  ><span class="timeline-track"
-                    ><i style={bar(s)} class:error-bar={s.hasError}></i></span
+                  ><span class="timeline-track"><i style={bar(s)}></i></span
                   ><span class="mono">{duration(s.durationMs)}</span></button
                 >
               </div>{/each}
           </div>
           {#if !rows.length}<div class="content-empty">
               {matches
-                ? "No steps match this search."
-                : "Waiting for the first recorded step."}
+                ? "No step payloads contain this text."
+                : "This trace has no steps yet."}
             </div>{/if}
         </div>
         <div class="tree-footer">
-          <kbd>↑</kbd><kbd>↓</kbd>navigate<span>← → collapse / expand</span>
+          <span><kbd>↑</kbd><kbd>↓</kbd> move</span><span
+            ><kbd>←</kbd><kbd>→</kbd> collapse / expand</span
+          >
         </div>
       </section>
       <!-- ARIA window-splitter pattern is intentionally a focusable separator. -->
@@ -514,11 +548,21 @@
       <section class="inspector">
         <div class="inspector-heading">
           <div>
-            <span class="eyebrow">{activeSpan?.spanType || "STEP DETAILS"}</span
-            >
+            {#if activeSpan}<span
+                class={`type-chip mono kind-${kind(activeSpan)}`}
+                >{activeSpan.spanType}</span
+              >{/if}
             <h2>
-              {activeSpan?.name || activeSpan?.spanType || "Select a step"}
+              {activeSpan?.name || activeSpan?.spanType || "No step selected"}
             </h2>
+            {#if activeSpan}<div class="step-meta mono">
+                <span>{duration(activeSpan.durationMs)}</span
+                >{#if activeSpan.model}<span>{activeSpan.model}</span
+                  >{/if}{#if activeSpan.inputTokens || activeSpan.outputTokens}<span
+                    >{activeSpan.inputTokens.toLocaleString()} in / {activeSpan.outputTokens.toLocaleString()}
+                    out</span
+                  >{/if}
+              </div>{/if}
           </div>
           <button
             class="icon-button"
@@ -526,35 +570,19 @@
               copied(
                 location.origin +
                   `/traces/${encodeURIComponent(id)}?span=${encodeURIComponent(selected)}`,
-                "Step link copied",
+                "Link to step copied",
               )}
             disabled={!selected}
-            aria-label="Copy step link"><Icon name="link" size={17} /></button
+            title="Copy link to this step"
+            aria-label="Copy step link"><Icon name="link" size={16} /></button
           >
         </div>
-        {#if activeSpan}<div class="step-meta">
-            <span
-              ><Icon name="clock" size={13} />{duration(
-                activeSpan.durationMs,
-              )}</span
-            >{#if activeSpan.model}<span>{activeSpan.model}</span
-              >{/if}{#if activeSpan.inputTokens || activeSpan.outputTokens}<span
-                >{activeSpan.inputTokens} in / {activeSpan.outputTokens} out</span
-              >{/if}
-          </div>{/if}
         <div class="tabs" role="tablist" aria-label="Step detail tabs">
-          {#each ["content", "data", "raw", "trace"] as t}<button
+          {#each tabs as [t, label] (t)}<button
               role="tab"
               aria-selected={tab === t}
               class:active={tab === t}
-              onclick={() => (tab = t)}
-              >{t === "content"
-                ? "Input & output"
-                : t === "data"
-                  ? "Step data"
-                  : t === "raw"
-                    ? "Raw JSON"
-                    : "Trace"}</button
+              onclick={() => (tab = t)}>{label}</button
             >{/each}
         </div>
         <div
@@ -565,7 +593,7 @@
         >
           {#if tab === "trace"}<div class="content-section">
               <div class="section-title">
-                <h3>Trace metadata</h3>
+                <h3>Metadata</h3>
                 <button
                   class="icon-button"
                   aria-label="Copy trace metadata"
@@ -574,29 +602,39 @@
                 >
               </div>
               <JsonView value={trace.metadata} />
-              <div class="section-title"><h3>Original trace</h3></div>
+            </div>
+            <div class="content-section">
+              <div class="section-title">
+                <h3>Original trace record</h3>
+                <button
+                  class="icon-button"
+                  aria-label="Copy original trace record"
+                  onclick={() => copied(trace?.raw)}
+                  ><Icon name="copy" size={14} /></button
+                >
+              </div>
               <JsonView value={trace.raw} />
             </div>
           {:else if bodyLoading}<div class="content-loading">
-              <span class="spinner"></span>Loading step content…
+              <span class="spinner"></span>Loading step…
             </div>{:else if bodyError}<div class="notice error">
               {bodyError}<button
                 class="text-button"
                 onclick={() => select(selected, false)}>Try again</button
               >
             </div>{:else if !raw}<div class="content-empty">
-              Select a step to explore its input and output.
+              Select a step to see its input and output.
             </div>
           {:else if tab === "raw" || tab === "data"}<div
               class="content-section"
             >
               <div class="section-title">
-                <h3>{tab === "raw" ? "Original payload" : "Step data"}</h3>
+                <h3>{tab === "raw" ? "Original span record" : "span_data"}</h3>
                 <button
                   class="icon-button"
                   aria-label="Copy JSON"
                   onclick={() => copied(tab === "raw" ? raw : data)}
-                  ><Icon name="copy" size={15} /></button
+                  ><Icon name="copy" size={14} /></button
                 >
               </div>
               <JsonView value={tab === "raw" ? raw : data} />
@@ -604,7 +642,7 @@
           {:else}
             {#if raw.error}<div class="step-error">
                 <div class="section-title">
-                  <h3><Icon name="alert" size={16} />Error</h3>
+                  <h3><Icon name="alert" size={15} />Error</h3>
                   <button
                     class="icon-button"
                     aria-label="Copy error"
@@ -614,25 +652,24 @@
                 </div>
                 <JsonView value={raw.error} />
               </div>{/if}
-            {#each ["input", "output"] as kind}<div class="content-section">
+            {#each ["input", "output"] as part (part)}<div
+                class="content-section"
+              >
                 <div class="section-title">
-                  <h3>
-                    <span class="io-dot" class:output={kind === "output"}
-                    ></span>{kind === "input" ? "Input" : "Output"}
-                  </h3>
+                  <h3>{part === "input" ? "Input" : "Output"}</h3>
                   <button
                     class="icon-button"
-                    aria-label={`Copy ${kind}`}
-                    onclick={() => copied(data[kind])}
+                    aria-label={`Copy ${part}`}
+                    onclick={() => copied(data[part])}
                     ><Icon name="copy" size={14} /></button
                   >
                 </div>
-                <Content value={data[kind]} />
+                <Content value={data[part]} />
               </div>{/each}
             {#if data.input === undefined && data.output === undefined}<div
                 class="content-section"
               >
-                <div class="section-title"><h3>Recorded details</h3></div>
+                <div class="section-title"><h3>span_data</h3></div>
                 <JsonView value={data} />
               </div>{/if}
           {/if}
@@ -646,11 +683,11 @@
     onclose={() => {
       if (!deleting) confirmDelete = false;
     }}
-    ><span class="empty-icon danger"><Icon name="trash" size={23} /></span>
-    <h2 id="delete-title">Delete this trace?</h2>
+    ><h2 id="delete-title">Delete this trace?</h2>
     <p>
-      This removes the trace and all its recorded steps. This action cannot be
-      undone.
+      “{trace?.workflowName}” and its {plural(trace?.spanCount ?? 0, "step")} will
+      be permanently deleted. If the agent sends more data for this trace, it will
+      appear again.
     </p>
     <div class="modal-actions">
       <button

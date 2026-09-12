@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import Icon from "./Icon.svelte";
   import Modal from "./Modal.svelte";
-  import { api, copy, date, type Key } from "./api";
+  import { api, copy, date, relative, type Key } from "./api";
   let { notify }: { notify: (message: string) => void } = $props();
   let keys = $state<Key[]>([]),
     loading = $state(true),
@@ -20,6 +20,11 @@
       (k) => !k.revokedAt && (!k.expiresAt || k.expiresAt > Date.now()),
     ).length,
   );
+  const endpoint = `${location.origin}/v1/traces/ingest`;
+  const example = `curl ${endpoint} \\
+  -H "Authorization: Bearer $TRACE_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"data":[{"object":"trace","id":"trace_123","workflow_name":"My agent"}]}'`;
   async function load() {
     try {
       const data = await api<{ items: Key[]; legacyEnabled: boolean }>(
@@ -71,13 +76,17 @@
       saving = false;
     }
   }
-  async function copied(value: string) {
+  async function copied(value: string, message = "Copied") {
     try {
       await copy(value);
-      notify("Copied to clipboard");
+      notify(message);
     } catch {
-      notify("Clipboard unavailable. Select and copy the text manually.");
+      notify("Couldn't access the clipboard. Select the text and copy it.");
     }
+  }
+  function startCreate() {
+    creating = true;
+    modalError = "";
   }
   onMount(load);
 </script>
@@ -85,67 +94,58 @@
 <section class="keys-page">
   <div class="page-heading">
     <div>
-      <div class="eyebrow">CONNECT YOUR AGENTS</div>
-      <h1>API keys</h1>
-      <p>Give your agents a secure way to send their traces.</p>
+      <h1>
+        API keys{#if keys.length}<span class="heading-count">{active} active</span
+          >{/if}
+      </h1>
+      <p>
+        Agents use a key to send traces to this server. Keys can't read, export
+        or delete data.
+      </p>
     </div>
-    <button
-      class="button primary"
-      onclick={() => {
-        creating = true;
-        modalError = "";
-      }}><Icon name="plus" size={16} />Create API key</button
-    >
-  </div>
-  <div class="key-summary">
-    <span class="key-symbol"><Icon name="key" size={24} /></span>
-    <div>
-      <strong>{active} active {active === 1 ? "key" : "keys"}</strong>
-      <p>Keys can only send traces. Workspace access uses GitHub sign-in.</p>
-    </div>
-    <span class="badge">Ingest only</span>
+    {#if keys.length || error}<button
+        class="button primary"
+        onclick={startCreate}
+        ><Icon name="plus" size={15} />Create API key</button
+      >{/if}
   </div>
   {#if error}<div class="notice error">
       {error}<button class="button" onclick={load}>Try again</button>
     </div>{:else if loading}<div class="detail-loading">
       <span class="spinner"></span>Loading keys…
-    </div>{:else if !keys.length}<div class="empty-state keys-empty">
-      <span class="empty-icon"><Icon name="key" size={26} /></span>
-      <h2>A key for every connection</h2>
-      <p>
-        Create your first key, give it a name you recognize,<br />and add it to
-        your agent's tracing exporter.
-      </p>
-      <button class="button" onclick={() => (creating = true)}
-        ><Icon name="plus" size={15} />Create your first key</button
+    </div>{:else if !keys.length}<div class="empty-state">
+      <h2>No API keys yet</h2>
+      <p>Create one key for each agent or environment that sends traces.</p>
+      <button class="button primary" onclick={startCreate}
+        ><Icon name="plus" size={15} />Create API key</button
       >
     </div>
-  {:else}<div class="trace-table-wrap">
+  {:else}<div class="table-wrap">
       <table class="keys-table">
         <thead
           ><tr
             ><th>Name</th><th>Key</th><th>Status</th><th>Last used</th><th
-              >Created / expires</th
-            ><th></th></tr
+              >Created</th
+            ><th>Expires</th><th><span class="sr-only">Actions</span></th></tr
           ></thead
         ><tbody
-          >{#each keys as key (key.id)}<tr
-              ><td><strong>{key.name}</strong></td><td class="mono"
-                >{key.prefix}••••••</td
+          >{#each keys as key (key.id)}<tr class:inactive={!!key.revokedAt}
+              ><td><strong>{key.name}</strong></td><td class="mono muted"
+                >{key.prefix}…</td
               ><td
-                >{#if key.revokedAt}<span class="badge">Revoked</span
+                >{#if key.revokedAt}<span class="status neutral"
+                    ><span class="status-dot"></span>Revoked</span
                   >{:else if key.expiresAt && key.expiresAt < Date.now()}<span
-                    class="badge">Expired</span
-                  >{:else}<span class="badge success"
+                    class="status neutral"
+                    ><span class="status-dot"></span>Expired</span
+                  >{:else}<span class="status success"
                     ><span class="status-dot"></span>Active</span
                   >{/if}</td
-              ><td>{key.lastUsedAt ? date(key.lastUsedAt) : "Never"}</td><td
-                >{date(key.createdAt)}<span class="cell-sub"
-                  >{key.expiresAt
-                    ? `Expires ${date(key.expiresAt)}`
-                    : "No expiration"}</span
-                ></td
-              ><td
+              ><td title={key.lastUsedAt ? date(key.lastUsedAt) : undefined}
+                >{key.lastUsedAt ? relative(key.lastUsedAt) : "Never"}</td
+              ><td>{date(key.createdAt)}</td><td
+                >{key.expiresAt ? date(key.expiresAt) : "Never"}</td
+              ><td class="row-actions"
                 >{#if !key.revokedAt}<button
                     class="text-button danger-hover"
                     onclick={() => {
@@ -159,39 +159,43 @@
       </table>
     </div>{/if}
   {#if legacy}<div class="legacy-key">
-      <Icon name="key" size={18} />
-      <div>
-        <strong>Environment-managed token</strong>
-        <p>
-          The compatibility token is enabled. Remove TRACE_INGEST_TOKEN and
-          restart the service to revoke it.
-        </p>
-      </div>
-      <span class="badge">Environment</span>
-    </div>{/if}
-  <section class="connection-guide">
-    <div>
-      <span class="eyebrow">QUICK START</span>
-      <h2>Make the connection.</h2>
+      <Icon name="key" size={16} />
       <p>
-        Set your tracing exporter's endpoint to this URL and use your key as a
-        Bearer token.
+        <strong>An environment token is also accepted.</strong> To revoke it,
+        remove <code>TRACE_INGEST_TOKEN</code> and restart the server.
       </p>
+    </div>{/if}
+  <section class="connection-guide" aria-labelledby="send-title">
+    <h2 id="send-title">Send traces</h2>
+    <div class="endpoint">
+      <span>Endpoint</span><code>POST {endpoint}</code><button
+        class="icon-button"
+        onclick={() => copied(endpoint, "Endpoint copied")}
+        aria-label="Copy ingest endpoint"><Icon name="copy" size={14} /></button
+      >
     </div>
-    <div class="endpoint-box">
-      <span>INGEST ENDPOINT</span>
-      <div>
-        <code>{location.origin}/v1/traces/ingest</code><button
-          class="icon-button"
-          onclick={() => copied(location.origin + "/v1/traces/ingest")}
-          aria-label="Copy ingest endpoint"
-          ><Icon name="copy" size={16} /></button
-        >
-      </div>
+    <div class="code-block">
+      <pre>{example}</pre>
+      <button
+        class="icon-button"
+        onclick={() => copied(example, "Example copied")}
+        aria-label="Copy example request"><Icon name="copy" size={14} /></button
+      >
     </div>
-    <pre class="connection-example">Authorization: Bearer tr_…<br
-      />Content-Type: application/json<br />OpenAI-Beta: traces=v1<br /><br
-      />{'{ "data": [trace_or_span, …] }'}</pre>
+    <ul class="guide-notes">
+      <li>
+        The body is <code>{'{"data": [...]}'}</code> with up to 1,000 trace and span
+        records, 16 MiB at most.
+      </li>
+      <li>
+        A <code>200</code> response means the records are queued and will be written
+        within about a second.
+      </li>
+      <li>
+        On <code>503</code>, wait for the <code>Retry-After</code> interval and send
+        the same request again.
+      </li>
+    </ul>
   </section>
 </section>
 {#if creating}<Modal
@@ -219,18 +223,15 @@
         >Name<input
           required
           maxlength="100"
-          placeholder="e.g. Research agent · production"
+          placeholder="Research agent (production)"
           bind:value={name}
         /></label
       ><label class="field"
-        >Expiration <span class="muted">Optional</span><input
+        ><span>Expires <span class="muted">(optional)</span></span><input
           type="datetime-local"
           bind:value={expiry}
         /></label
       >
-      <div class="notice compact">
-        <Icon name="key" size={15} />This key can send traces only.
-      </div>
       {#if modalError}<div class="notice error">{modalError}</div>{/if}
       <div class="modal-actions">
         <button
@@ -245,17 +246,14 @@
     </form></Modal
   >{/if}
 {#if created}<Modal titleId="created-title" onclose={() => (created = "")}
-    ><span class="empty-icon"><Icon name="check" size={25} /></span>
-    <h2 id="created-title">Your key is ready</h2>
-    <p>
-      Copy it now and store it somewhere safe.<br />You won't be able to view it
-      again.
-    </p>
+    ><h2 id="created-title">API key created</h2>
+    <p>Copy the key now. It won't be shown again.</p>
     <div class="secret-key">
       <code data-testid="new-key">{created}</code><button
         class="icon-button"
         aria-label="Copy API key"
-        onclick={() => copied(created)}><Icon name="copy" /></button
+        onclick={() => copied(created, "API key copied")}
+        ><Icon name="copy" size={16} /></button
       >
     </div>
     <div class="modal-actions">
@@ -270,8 +268,8 @@
     }}
     ><h2 id="revoke-title">Revoke “{revoke.name}”?</h2>
     <p>
-      Agents using this key will no longer be able to send traces. You can
-      create a replacement key at any time.
+      Requests using this key will be rejected from now on. Traces it already
+      sent are kept.
     </p>
     {#if modalError}<div class="notice error">{modalError}</div>{/if}
     <div class="modal-actions">
