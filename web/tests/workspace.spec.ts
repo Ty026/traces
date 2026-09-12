@@ -233,8 +233,10 @@ test("list scroll survives detail navigation and updates wait for the reader", a
   await expect(page.locator("tbody tr")).toHaveCount(50);
   const table = page.locator(".trace-table-wrap");
   await table.evaluate((el) => (el.scrollTop = 1200));
+  const link = page.locator(".trace-link").nth(17);
+  await link.scrollIntoViewIfNeeded();
   const before = await table.evaluate((el) => el.scrollTop);
-  await page.locator(".trace-link").nth(17).click();
+  await link.click();
   await expect(
     page.getByRole("heading", { name: "Execution", exact: true }),
   ).toBeVisible();

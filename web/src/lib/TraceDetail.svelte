@@ -99,9 +99,10 @@
     walk(spans.filter((s) => !rootReachable.has(s.id) && !visited.has(s.id)));
     return matches ? result.filter((row) => matches!.has(row.span.id)) : result;
   });
-  const start = $derived(Math.max(0, Math.floor(scrollTop / 48) - 6));
+  const rowHeight = 40;
+  const start = $derived(Math.max(0, Math.floor(scrollTop / rowHeight) - 6));
   const visible = $derived(
-    rows.slice(start, start + Math.ceil(viewport / 48) + 12),
+    rows.slice(start, start + Math.ceil(viewport / rowHeight) + 12),
   );
   const totalDuration = $derived(
     Math.max(
@@ -235,9 +236,10 @@
     );
     if (!rows[next]) return;
     select(rows[next].span.id);
-    if (next * 48 < treeElement.scrollTop) treeElement.scrollTop = next * 48;
-    else if ((next + 1) * 48 > treeElement.scrollTop + viewport)
-      treeElement.scrollTop = (next + 1) * 48 - viewport;
+    if (next * rowHeight < treeElement.scrollTop)
+      treeElement.scrollTop = next * rowHeight;
+    else if ((next + 1) * rowHeight > treeElement.scrollTop + viewport)
+      treeElement.scrollTop = (next + 1) * rowHeight - viewport;
   }
   function resize(e: PointerEvent) {
     if (!resizing) return;
@@ -421,13 +423,13 @@
           role="tree"
           aria-label="Execution steps"
         >
-          <div style={`height:${rows.length * 48}px;position:relative`}>
+          <div style={`height:${rows.length * rowHeight}px;position:relative`}>
             {#each visible as row, i (row.span.id)}{@const s = row.span}
               <div
                 class="tree-row"
                 class:selected={selected === s.id}
                 class:has-error={s.hasError}
-                style={`position:absolute;top:${(start + i) * 48}px;width:100%;height:48px`}
+                style={`position:absolute;top:${(start + i) * rowHeight}px;width:100%;height:${rowHeight}px`}
                 role="treeitem"
                 aria-selected={selected === s.id}
                 aria-level={row.depth + 1}
