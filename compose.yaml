@@ -11,7 +11,7 @@ services:
       BACKUP_DIR: /data/backups
       STATIC_DIR: /app/web
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${TRACES_PORT:-3000}:3000"
     volumes:
       - traces-data:/data
     cpus: 2

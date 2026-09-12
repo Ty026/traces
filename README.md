@@ -48,7 +48,7 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-Compose binds port 3000 to the host loopback address and uses a named volume for SQLite and backups. The container runs as UID 10001, with 2 CPU / 2 GiB limits and a 60-second shutdown grace period. Put an HTTPS reverse proxy in front for external access. For a bind mount, make the directory writable by UID 10001. Run exactly one instance against a database; an application lock rejects accidental duplicate instances. Use a local disk, not NFS/SMB.
+Compose binds port 3000 to the host loopback address by default and uses a named volume for SQLite and backups. To use another host port, set both `TRACES_PORT=4180` and `PUBLIC_BASE_URL=http://localhost:4180` in `.env`. The `unless-stopped` restart policy restarts the service after failures and Docker daemon restarts; enable Docker at boot for persistent local operation. The container runs as UID 10001, with 2 CPU / 2 GiB limits and a 60-second shutdown grace period. Put an HTTPS reverse proxy in front for external access. For a bind mount, make the directory writable by UID 10001. Run exactly one instance against a database; an application lock rejects accidental duplicate instances. Use a local disk, not NFS/SMB.
 
 ## Send traces
 
