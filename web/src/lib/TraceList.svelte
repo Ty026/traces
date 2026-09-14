@@ -103,7 +103,7 @@
   }
   async function apply() {
     if (range === "custom" && customFrom && customTo && customFrom > customTo) {
-      notify("The start of the range must be before the end.");
+      notify("Choose an end date on or after the start date.");
       return;
     }
     cursor = null;
@@ -290,12 +290,10 @@
     ><input
       class="model-input"
       aria-label="Model filter"
-      placeholder="Model (exact)"
+      placeholder="Exact model name"
       bind:value={model}
       onblur={() => {
-        if (
-          model !== (new URLSearchParams(location.search).get("model") || "")
-        )
+        if (model !== (new URLSearchParams(location.search).get("model") || ""))
           apply();
       }}
     /><button class="filter-submit" type="submit" tabindex="-1">Apply</button>
@@ -319,7 +317,7 @@
         >{/if}
     </div>{/if}
   {#if fresh}<button class="new-data" onclick={() => load()}
-      ><Icon name="refresh" size={14} />New traces arrived. Show latest</button
+      ><Icon name="refresh" size={14} />Updates available. Refresh traces</button
     >{/if}
   {#if error}<div class="notice error" role="alert">
       {error}<button class="button" onclick={() => load()}>Try again</button>
@@ -336,10 +334,7 @@
         <button class="button" onclick={clear}>Clear filters</button>
       {:else}
         <h2>No traces in the last 7 days</h2>
-        <p>
-          Traces show up here as soon as an agent sends them. Create an API key
-          to connect one.
-        </p>
+        <p>Create an API key and use it to send traces from your agent.</p>
         <a class="button primary" href="/keys"
           ><Icon name="key" size={15} />Create API key</a
         >
@@ -375,7 +370,8 @@
                 ></td
               ><td
                 >{#if trace.errorCount}<span class="status error"
-                    ><span class="status-dot"></span>{trace.errorCount.toLocaleString()}
+                    ><span class="status-dot"
+                    ></span>{trace.errorCount.toLocaleString()}
                     {trace.errorCount === 1 ? "error" : "errors"}</span
                   >{:else if trace.unfinishedCount || !trace.spanCount}<span
                     class="status neutral"

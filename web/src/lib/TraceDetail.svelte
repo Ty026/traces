@@ -397,7 +397,7 @@
       </div>
     </dl>
     {#if updated}<button class="new-data" onclick={load}
-        ><Icon name="refresh" size={14} />This trace has new data. Reload it</button
+        ><Icon name="refresh" size={14} />Updates available. Refresh trace</button
       >{/if}
     <div
       class="execution-layout"
@@ -422,7 +422,7 @@
         >
           <Icon name="search" size={14} /><input
             aria-label="Find in this trace"
-            placeholder="Find text in step payloads"
+            placeholder="Search step contents"
             bind:value={find}
           />{#if matches}<button
               class="icon-button"
@@ -440,7 +440,7 @@
         </form>
         {#if matches}<div class="search-results">
             {plural(matches.size, "matching step")}{searchTruncated
-              ? " (showing the first 1,000)"
+              ? ". Showing the first 1,000."
               : ""}
           </div>{/if}{#if searchError}<div class="notice error compact">
             {searchError}
@@ -466,8 +466,8 @@
           aria-label="Execution steps"
         >
           <div style={`height:${rows.length * rowHeight}px;position:relative`}>
-            {#each visible as row, i (row.span.id)}{@const s = row.span}{@const k =
-                kind(s)}
+            {#each visible as row, i (row.span.id)}{@const s =
+                row.span}{@const k = kind(s)}
               <div
                 class={`tree-row kind-${k}`}
                 class:selected={selected === s.id}
@@ -492,7 +492,7 @@
                     >{:else}<span class="tree-toggle"></span>{/if}<button
                     class="step-select"
                     onclick={() => select(s.id)}
-                    title={`${s.name || s.spanType} (${s.spanType})`}
+                    title={`${s.name || s.spanType}, ${s.spanType}`}
                     ><span class="step-icon"
                       ><Icon name={kindIcon[k]} size={14} /></span
                     ><span>{s.name || s.spanType}</span></button
@@ -509,7 +509,7 @@
           </div>
           {#if !rows.length}<div class="content-empty">
               {matches
-                ? "No step payloads contain this text."
+                ? "No steps contain this text."
                 : "This trace has no steps yet."}
             </div>{/if}
         </div>
@@ -685,9 +685,11 @@
     }}
     ><h2 id="delete-title">Delete this trace?</h2>
     <p>
-      “{trace?.workflowName}” and its {plural(trace?.spanCount ?? 0, "step")} will
-      be permanently deleted. If the agent sends more data for this trace, it will
-      appear again.
+      This deletes "{trace?.workflowName}" and its {plural(
+        trace?.spanCount ?? 0,
+        "step",
+      )}. If the agent sends more data with this trace ID, the trace will appear
+      again.
     </p>
     <div class="modal-actions">
       <button

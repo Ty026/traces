@@ -21,6 +21,5 @@
   ></pre>
 {#if !expanded && text.length > 24000}<button
     class="text-button"
-    onclick={() => (expanded = true)}
-    >Show full content ({Math.ceil(text.length / 1024)} KB)</button
+    onclick={() => (expanded = true)}>Show full JSON</button
   >{/if}

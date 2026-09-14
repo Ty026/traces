@@ -1,25 +1,46 @@
-# Agreed design
+# Design contracts
 
-Replace Next.js/PostgreSQL with Rust (Axum/Tokio), SvelteKit static export, and local SQLite. One service instance, local SSD, no shared network filesystem. Old Postgres data stays untouched; no migration.
+Agent Traces runs as one Rust service using Axum and Tokio. It serves a SvelteKit static build and stores data in SQLite on a local SSD. Run one instance per database. Shared network filesystems are not supported.
 
-## Ingestion contract
+## Ingestion
 
-`POST /v1/traces/ingest`, Bearer authentication, `{ "data": [ ... ] }`, at most 1,000 object records. `trace` and `trace.span` retain original JSON. Invalid items are counted as rejected; malformed envelopes return 400. Upserts and spans arriving before traces must work. IDs remain globally unique.
+`POST /v1/traces/ingest` uses Bearer authentication and accepts `{ "data": [ ... ] }` with at most 1,000 object records. Preserve the original JSON for `trace` and `trace.span`. Count invalid records as rejected and return `400` for malformed envelopes. Support updates by globally unique ID and spans arriving before their trace.
 
-200 `{accepted,rejected}` means admission to a bounded in-memory queue. Flush within one second under normal load. Retain failed batches and retry; stop admitting while the writer is unhealthy. Saturation returns retryable 503. Abrupt termination can lose all uncommitted records, including backlogs older than one second. Normal shutdown drains the queue. Limit queued bytes as well as batch count.
+A `200` response with `{accepted,rejected}` acknowledges admission to a bounded in-memory queue. The queue owns accepted records until they commit. Limit both queued bytes and batch count. Flush within one second under normal load.
+
+Keep failed batches and retry them. Stop accepting new ingestion while the writer is unhealthy. Return a retryable `503` when the queue is full. Abrupt termination can lose all uncommitted records, including records older than one second. Drain the queue during normal shutdown.
+
+Keep SQLite work off Tokio executor threads.
 
 ## Authentication
 
-GitHub OAuth checks verified emails from `/user/emails` against exact addresses in `ALLOWED_EMAILS` (case-insensitive). Empty allowlist denies access. All admitted users administer the shared dataset and keys. Cookie sessions protect viewer/read/export/delete/key APIs. OAuth state, PKCE, HttpOnly cookies and same-origin mutation checks protect browser authentication. API keys authorize ingestion only: names, optional expiry, last usage, revocation, one-time plaintext display, hashes stored. Optional `TRACE_INGEST_TOKEN` remains environment-managed and identified in the UI.
+GitHub OAuth checks verified addresses from `/user/emails` against `ALLOWED_EMAILS`. Require an exact match, ignoring case. An empty access list denies everyone. All allowed users administer the same traces and keys.
 
-`PUBLIC_BASE_URL` determines `/auth/github/callback`. Operator supplies OAuth credentials. Real GitHub verification follows when supplied; tests use a controlled OAuth provider, never a production authentication bypass.
+Cookie sessions protect viewer, read, export, delete and key-management APIs. Use OAuth state, PKCE, HttpOnly cookies and same-origin mutation checks. API keys authorize ingestion only. Support key names, optional expiration, last usage and revocation. Show each full key once and store its hash. Identify the optional `TRACE_INGEST_TOKEN` separately in the UI because the server administrator manages it through the environment.
 
-## Data and UI
+Build the `/auth/github/callback` URL from `PUBLIC_BASE_URL`. GitHub sign-in requires OAuth App credentials. Tests use a controlled OAuth provider without adding a production authentication bypass.
 
-Retain entire traces for 30 days since last receipt; configurable, 0 disables cleanup. Daily consistent backups, retain last 7; CLI restore while stopped. Local backups support recovery; off-machine replication is operator-managed.
+## Retention and recovery
 
-English developer-console UI: neutral colors, thin separators, light/dark. Find a trace, inspect virtualized tree/waterfall, read structured messages and tool calls. Cursor pagination; date, status, type, model and text filters; restore list filters/scroll. Resizable panes, lazy span payloads, copy, JSON export, span deep links, keyboard navigation, unobtrusive refresh, clear loading/empty/error states. Absence of errors is not proof of completion. Global normalized-field search plus content search inside one trace. Global payload search and aggregate analytics are outside v1.
+Keep each trace for 30 days after its last received update by default. Make retention configurable and let `0` disable cleanup. Create consistent backups daily and keep the latest seven. Restore through the CLI while the service is stopped. Administrators are responsible for copying backups off the machine.
 
-## Delivery and performance acceptance
+## Viewer
 
-Binary, Docker image, Compose, documentation, local tests and reproducible benchmarks. Formal deployment is separate. Target: 2 CPU cores, 2 GiB RAM, SSD; 1 million spans; sustained 100 spans/s, short peaks of 1,000 spans/s; common list/filter API p95 <=200ms; smooth 10,000-span tree with lazy bodies. Publish hardware, query mix, concurrency, payload sizes, duration, throughput, queue drain and limitations. Test million-span reads during ingestion. Fast enqueue responses alone do not demonstrate SQLite throughput.
+Use neutral colors, thin separators and light and dark themes. Let users find a trace, follow its execution tree and timeline, and read model messages and tool calls.
+
+Support cursor pagination and date, status, step type, model and text filters. Restore list filters and scroll position when returning from a trace. Let users resize panels, copy content, export JSON, link to a step and navigate with the keyboard. Fetch large span bodies only when selected. Show loading, empty and error states, and offer new data without interrupting the current view.
+
+Search normalized fields across traces and raw content within one trace. Global payload search and aggregate analytics are outside the current scope. Do not treat the absence of errors as proof of completion.
+
+## Delivery and performance targets
+
+Provide a binary, Docker image, Compose configuration, documentation, tests and reproducible benchmarks.
+
+Target a host with 2 CPU cores, 2 GiB RAM and an SSD:
+
+- Store 1 million spans.
+- Sustain 100 spans/s and handle short peaks of 1,000 spans/s.
+- Keep common list and filter API latency at p95 of 200 ms or less during ingestion.
+- Keep a 10,000-span tree responsive while fetching bodies on demand.
+
+Report hardware, query mix, concurrency, payload sizes, duration, throughput, queue drain and limitations with benchmark results. Verify that accepted records reach SQLite. Queue admission latency alone does not measure write throughput.

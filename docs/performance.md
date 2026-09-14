@@ -1,12 +1,12 @@
-# Performance validation
+# Performance
 
-Measured 2026-09-12, on an AMD Ryzen 9 5900HS host, Linux 6.19, local NVMe SSD. The production Docker image ran as its non-root `traces` user with **2 CPU quota, 2 GiB memory, and 2 GiB total memory+swap** (no additional swap allowance). The load generator ran outside the container. This is a short mixed-load benchmark, not an endurance or capacity guarantee.
+Measured on September 12, 2026, on an AMD Ryzen 9 5900HS host running Linux 6.19 with a local NVMe SSD. The Docker container ran as the non-root `traces` user with a quota of 2 CPUs and 2 GiB of memory, with no additional swap. The load generator ran outside the container. The test covered 40 seconds of concurrent reads and writes. It did not measure long-term capacity.
 
-## Workload and result
+## Workload and results
 
-The database was seeded with **1,000,000 spans**, approximately **4 KiB raw JSON per span**, 20 spans per trace, five workflows, model/tool/agent steps, and errors in 1% of spans. Pilot runs added records before the final run; exact before/after counts are in [the machine-readable report](benchmarks/sqlite-1m.json). SQLite stores raw payloads without compression. The final database was about 4.57 GiB. The synthetic padding is repetitive text, so this is not a benchmark of arbitrary production payload distributions.
+The seed contained 1,000,000 spans with about 4 KiB of raw JSON per span, 20 spans per trace and five workflows. Spans included model, tool and agent steps, with errors in 1% of records. Preliminary runs added records before the final measurement. The [JSON report](benchmarks/sqlite-1m.json) includes the exact counts before and after the run. SQLite stores raw payloads without compression, and the final database was about 4.57 GiB. Payloads used repetitive text padding, so their size distribution does not represent production traffic.
 
-Four readers targeted a combined 40 HTTP requests/s across 11 operations while one producer sent 100 spans/s for 30 seconds, then 1,000 spans/s for 10 seconds. Ingestion batches contained 10 or 100 spans, approximately 3.8 KiB each. Every response, accepted count, process commit count, and persisted span count was checked. Data and indexes were warm from seeding and pilot runs; daily backup did not overlap the final measured interval.
+Four readers targeted a combined 40 HTTP requests/s across 11 operations while one producer sent 100 spans/s for 30 seconds, then 1,000 spans/s for 10 seconds. Ingestion batches contained 10 or 100 spans, with approximately 3.8 KiB per span. The script checked HTTP responses, accepted counts, the process commit count and the stored span count. Seeding and preliminary runs had warmed the data and indexes. No backup ran during the measurement.
 
 | Measurement | Result |
 | --- | ---: |
@@ -26,19 +26,21 @@ Four readers targeted a combined 40 HTTP requests/s across 11 operations while o
 | Trace header / tree / selected body p95 | 1.93 / 1.96 / 1.75 ms |
 | Largest observed backlog | 200 records, about 2.4 MiB estimated queue memory |
 
-All measured read operations met the <=200 ms p95 target. Ingestion acknowledgement is queue admission; the separate persisted-count check proves these accepted records actually reached SQLite. Reported drain time is the time observed after the producer's final paced interval, not per-record durability latency. Docker-reported memory usage ranged from approximately **50–82 MiB** during sampling. Raw Docker memory/CPU samples are in [container-stats.json](benchmarks/container-stats.json); Docker memory usage excludes inactive file cache.
+Every measured read operation had a p95 below 200 ms. The stored span count confirmed that all 13,000 accepted records reached SQLite. Ingestion acknowledgement measures queue admission. The reported drain time starts after the producer's final paced interval, so it does not measure how long each record waited for a commit. Docker reported about 50 to 82 MiB of memory use, excluding inactive file cache. See the raw [memory and CPU samples](benchmarks/container-stats.json).
 
-Before adding the normalized trigram index, the no-result search p95 was **4,019 ms** on the same million-span dataset in an unrestricted native pilot. Searching separate workflow/identifier/model/error fields removed the need to inspect all span payload pages. Input/output content remains unindexed globally. This before/after pilot identifies the bottleneck; the final acceptance numbers above come from the limited container.
+A preliminary native run without container limits measured a no-result search p95 of 4,019 ms on the same million-span dataset. Adding a trigram index over workflow, identifier, model and error fields removed the need to scan span payload pages. Global search does not index input or output content. The results in the table come from the container with CPU and memory limits, so they are not a direct comparison with the native run.
 
 ## Frontend
 
-The static frontend built successfully with zero Svelte/TypeScript diagnostics. Its JavaScript chunks total roughly 54 KiB gzip and its stylesheet about 6 KiB gzip; no external fonts or image requests are needed. The native release binary is about 8.5 MiB; the tested production image is about 94 MiB.
+At the time of the test, the frontend contained about 54 KiB of gzipped JavaScript and 6 KiB of gzipped CSS. Fonts and images were served locally. The native release binary was about 8.5 MiB and the Docker image about 94 MiB.
 
-Real-browser tests against the Rust server verify authentication gating, static deep links, filters, pagination, returning with filters and scroll position, structured content, payload HTML escaping, export, one-time keys, ingestion-only scope, revocation, mobile layout, dialog focus/Escape, and deferred live updates. The 10,000-step fixture renders fewer than 45 tree rows at a time and requests only the selected body. A 120-frame scrolling probe measured p95 frame intervals of **18.9–27.5 ms** across runs on the host browser. This validates that browser/workload; it does not guarantee identical frame rates on every device. Screenshots in [screenshots/](screenshots/) were captured from these isolated fixtures.
+Browser tests use the Rust server to check sign-in requirements, deep links, filters, pagination and restored scroll position. They also cover message rendering, HTML escaping, export, key creation and revocation, mobile layout, dialog controls and refresh prompts.
+
+The 10,000-step test renders fewer than 45 tree rows at a time and fetches only the selected body. A 120-frame scrolling test measured p95 frame intervals of 18.9 to 27.5 ms across runs in the host browser. These measurements apply to that host and fixture. The [screenshots](screenshots/) come from the same test fixtures.
 
 ## Reproduce
 
-Use a fresh directory **on SSD** with at least 12 GiB free for the seed and a local backup. Avoid `/tmp` when it is tmpfs. The seed refuses a nonempty database and generates credentials only for that synthetic database. Never seed an operator database.
+Use a new directory on an SSD with at least 12 GiB free for the test database and a backup. Avoid `/tmp` if it uses tmpfs. The seed command refuses a nonempty database and creates credentials for the test database. Keep it separate from your application data.
 
 ```bash
 cargo build --release --example seed
@@ -62,4 +64,4 @@ docker stop agent-traces-benchmark
 docker rm agent-traces-benchmark
 ```
 
-The script fails on HTTP/count errors or read p95 exceeding 200 ms. Increase phase durations for endurance testing. Retention volume, simultaneous long exports/backups, highly skewed traces, unusually large messages, cold cache, and much greater concurrency need separate load tests before raising the supported operating envelope.
+The script fails if an HTTP request or record count check fails, a write phase misses its rate target, or read p95 exceeds 200 ms. Increase the phase durations to test sustained load. Run separate tests for your expected retention volume, concurrent exports and backups, uneven trace sizes, large messages, cold caches and higher concurrency.

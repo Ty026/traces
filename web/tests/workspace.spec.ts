@@ -306,12 +306,12 @@ test("list scroll survives detail navigation and updates wait for the reader", a
   }, key.key);
   await expect(
     page.getByRole("button", {
-      name: "New traces arrived. Show latest",
+      name: "Updates available. Refresh traces",
     }),
   ).toBeVisible({ timeout: 12000 });
   expect(await page.locator(".trace-link").first().innerText()).toBe(first);
   await page
-    .getByRole("button", { name: "New traces arrived. Show latest" })
+    .getByRole("button", { name: "Updates available. Refresh traces" })
     .click();
   await expect(page.locator(".trace-link").first()).toContainText(
     "New live arrival",

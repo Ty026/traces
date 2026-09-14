@@ -36,8 +36,8 @@
     {#if m}
       <section class="message" data-role={String(m.role || m.type || "")}>
         <div class="message-role">
-          {String(m.role || m.type || "message")}{#if m.name}<span
-              class="mono">{String(m.name)}</span
+          {String(m.role || m.type || "message")}{#if m.name}<span class="mono"
+              >{String(m.name)}</span
             >{/if}{#if m.tool_call_id}<span class="mono"
               >{String(m.tool_call_id)}</span
             >{/if}
@@ -62,8 +62,7 @@
   {/each}
   {#if messages.length > messageLimit}<button
       class="text-button"
-      onclick={() => (messageLimit += 100)}
-      >Show 100 more ({messages.length - messageLimit} hidden)</button
+      onclick={() => (messageLimit += 100)}>Show more messages</button
     >{/if}
 {:else if typeof value === "string"}<LongText text={value} />
 {:else}<JsonView {value} />{/if}

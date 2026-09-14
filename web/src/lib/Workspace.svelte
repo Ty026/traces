@@ -88,7 +88,7 @@
       fetch("/api/me").then(async (r) => {
         if (r.ok) user = await r.json();
         else if (r.status !== 401)
-          throw new Error("Can't reach the server. Check that it's running.");
+          throw new Error("Couldn't check your session. Try again.");
       }),
       api<{ ready: boolean }>("/auth/config").then((c) => (ready = c.ready)),
     ])
@@ -114,7 +114,7 @@
     >{traceId ? "Trace" : section === "keys" ? "API keys" : "Traces"} · Agent Traces</title
   ><meta
     name="description"
-    content="Self-hosted viewer for agent traces."
+    content="Inspect agent runs, model messages and tool calls."
   /></svelte:head
 >
 {#if !loaded}<div class="initial-loading">
@@ -133,9 +133,7 @@
     <main class="login-card">
       <span class="brand-mark"><Icon name="trace" size={22} /></span>
       <h1>Sign in to Agent Traces</h1>
-      <p>
-        Use a GitHub account with a verified email on this server's access list.
-      </p>
+      <p>Sign in with a GitHub account that has access to this server.</p>
       {#if error}<div class="notice error">
           {error}<button class="text-button" onclick={() => location.reload()}
             >Try again</button
@@ -143,8 +141,8 @@
         </div>{/if}
       {#if authError}<div class="notice error" role="alert">
           {authError === "not_allowed"
-            ? "None of your verified GitHub emails are on the access list. Ask an administrator to add one to ALLOWED_EMAILS."
-            : "GitHub sign-in didn't finish. Try again."}
+            ? "None of your verified GitHub emails have access to this server. Ask the server administrator to add your email."
+            : "Couldn't sign in with GitHub. Try again."}
         </div>{/if}
       {#if ready}
         <!-- OAuth is handled by Rust, outside the client-side catch-all route. -->
@@ -157,8 +155,8 @@
       {:else if !error}<div class="notice">
           <strong>GitHub sign-in isn't configured</strong>
           <p>
-            Set <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code>
-            and <code>ALLOWED_EMAILS</code>, then restart the server.
+            Ask the server administrator to set up GitHub sign-in. Setup
+            instructions are in the README.
           </p>
         </div>{/if}
     </main>
@@ -188,7 +186,10 @@
         >
       </nav>
       <div class="sidebar-bottom">
-        <div class="retention" title="Traces expire after their last update">
+        <div
+          class="retention"
+          title="Retention starts from the last received update"
+        >
           <Icon name="clock" size={14} /><span
             >{status?.retentionDays === 0
               ? "Traces kept indefinitely"
@@ -227,8 +228,8 @@
           role="alert"
         >
           <Icon name="alert" size={16} />{!status.writerHealthy
-            ? `Storage is unavailable. ${status.pending.toLocaleString()} records are waiting to be written, and new traces are being rejected.`
-            : "Cleanup or backup failed. Check the server logs."}
+            ? `Storage writes are failing. ${status.pending.toLocaleString()} records are queued. The server cannot accept new traces.`
+            : "Trace cleanup or backup failed. Check the server logs."}
         </div>{/if}
       <main class="main-content">
         {#if section === "keys"}<Keys {notify} />{:else}<div

@@ -95,12 +95,12 @@
   <div class="page-heading">
     <div>
       <h1>
-        API keys{#if keys.length}<span class="heading-count">{active} active</span
+        API keys{#if keys.length}<span class="heading-count"
+            >{active} active</span
           >{/if}
       </h1>
       <p>
-        Agents use a key to send traces to this server. Keys can't read, export
-        or delete data.
+        Use API keys to send traces. They cannot read, export or delete data.
       </p>
     </div>
     {#if keys.length || error}<button
@@ -161,12 +161,15 @@
   {#if legacy}<div class="legacy-key">
       <Icon name="key" size={16} />
       <p>
-        <strong>An environment token is also accepted.</strong> To revoke it,
-        remove <code>TRACE_INGEST_TOKEN</code> and restart the server.
+        This server also accepts <code>TRACE_INGEST_TOKEN</code>. To revoke it,
+        remove it from the server environment and restart the server.
       </p>
     </div>{/if}
   <section class="connection-guide" aria-labelledby="send-title">
     <h2 id="send-title">Send traces</h2>
+    <p>
+      Set <code>TRACE_API_KEY</code> to your key before running this request.
+    </p>
     <div class="endpoint">
       <span>Endpoint</span><code>POST {endpoint}</code><button
         class="icon-button"
@@ -184,12 +187,13 @@
     </div>
     <ul class="guide-notes">
       <li>
-        The body is <code>{'{"data": [...]}'}</code> with up to 1,000 trace and span
-        records, 16 MiB at most.
+        Send a <code>{'{"data": [...]}'}</code> body with up to 1,000 trace and span
+        records. Each request can be at most 16 MiB.
       </li>
       <li>
-        A <code>200</code> response means the records are queued and will be written
-        within about a second.
+        A <code>200</code> response reports accepted and rejected records. Accepted
+        records are queued and usually reach storage within a second. A crash can
+        lose queued records.
       </li>
       <li>
         On <code>503</code>, wait for the <code>Retry-After</code> interval and send
@@ -223,11 +227,11 @@
         >Name<input
           required
           maxlength="100"
-          placeholder="Research agent (production)"
+          placeholder="Production research agent"
           bind:value={name}
         /></label
       ><label class="field"
-        ><span>Expires <span class="muted">(optional)</span></span><input
+        ><span>Expires <span class="muted">optional</span></span><input
           type="datetime-local"
           bind:value={expiry}
         /></label
@@ -266,10 +270,10 @@
     onclose={() => {
       if (!saving) revoke = null;
     }}
-    ><h2 id="revoke-title">Revoke “{revoke.name}”?</h2>
+    ><h2 id="revoke-title">Revoke "{revoke.name}"?</h2>
     <p>
-      Requests using this key will be rejected from now on. Traces it already
-      sent are kept.
+      The server will reject new requests with this key. Records already
+      accepted will be kept.
     </p>
     {#if modalError}<div class="notice error">{modalError}</div>{/if}
     <div class="modal-actions">
