@@ -32,6 +32,28 @@ test("private workspace and static deep links", async ({ page }) => {
   await expect(page.getByText("GitHub sign-in isn't configured")).toBeVisible();
   await page.screenshot({ path: "test-results/login.png", fullPage: true });
 });
+test("GitHub sign-in navigates through the server and opens the workspace without a refresh", async ({
+  page,
+  context,
+}) => {
+  await page.route("**/auth/config", (route) =>
+    route.fulfill({ json: { ready: true } }),
+  );
+  const loginRequests: boolean[] = [];
+  // Model the successful OAuth round trip at the browser/server boundary.
+  await page.route("**/auth/github", async (route) => {
+    loginRequests.push(route.request().isNavigationRequest());
+    await login(context);
+    await route.fulfill({ status: 302, headers: { location: "/traces" } });
+  });
+  await page.goto("/");
+  await page.getByRole("link", { name: "Continue with GitHub" }).click();
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL("/traces");
+  expect(loginRequests).toEqual([true]);
+});
 test("filters, pagination, details, payload escaping and return state", async ({
   page,
   context,

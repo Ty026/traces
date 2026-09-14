@@ -146,7 +146,12 @@
             ? "None of your verified GitHub emails are on the access list. Ask an administrator to add one to ALLOWED_EMAILS."
             : "GitHub sign-in didn't finish. Try again."}
         </div>{/if}
-      {#if ready}<a href="/auth/github" class="button primary github-button"
+      {#if ready}
+        <!-- OAuth is handled by Rust, outside the client-side catch-all route. -->
+        <a
+          href="/auth/github"
+          data-sveltekit-reload
+          class="button primary github-button"
           ><Icon name="github" size={18} />Continue with GitHub</a
         >
       {:else if !error}<div class="notice">
